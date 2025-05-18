@@ -12,33 +12,47 @@ import "encoding/json"
 //
 // (TasksResubscribe, TaskIDParams)
 
-// Define a mapping between Method and the corresponding Params type
+// MethodToParamsType defines a mapping between each Method and its corresponding Params type.
+// This map is used for validation and type checking when processing requests.
+// Each method is associated with an empty instance of its expected parameter type.
 var MethodToParamsType = map[Method]Params{
-	TasksSend:          TaskSendParams{},
-	TasksSendSubscribe: TaskSendParams{},
-	TasksGet:           TaskQueryParams{},
-	TasksCancel:        TaskIDParams{},
-	TasksResubscribe:   TaskIDParams{},
+	TasksSend:          TaskSendParams{},  // Regular task sending uses TaskSendParams
+	TasksSendSubscribe: TaskSendParams{},  // Streaming task sending also uses TaskSendParams
+	TasksGet:           TaskQueryParams{}, // Task retrieval uses TaskQueryParams
+	TasksCancel:        TaskIDParams{},    // Task cancellation uses TaskIDParams
+	TasksResubscribe:   TaskIDParams{},    // Task resubscription uses TaskIDParams
 }
 
+// Method represents an A2A API method name.
+// These are the operations that can be performed on an A2A-compatible agent.
 type Method string
 
 const (
-	TasksSend                Method = "tasks/send"
-	TasksSendSubscribe       Method = "tasks/sendSubscribe"
-	TasksPushNotificationGet Method = "tasks/pushNotification/get"
-	TasksPushNotificationSet Method = "tasks/pushNotification/set"
-	TasksGet                 Method = "tasks/get"
-	TasksCancel              Method = "tasks/cancel"
-	TasksResubscribe         Method = "tasks/resubscribe"
+	// Task management methods
+	TasksSend          Method = "tasks/send"          // Send a task to an agent
+	TasksSendSubscribe Method = "tasks/sendSubscribe" // Send a task and subscribe to streaming updates
+	TasksGet           Method = "tasks/get"           // Get information about a task
+	TasksCancel        Method = "tasks/cancel"        // Cancel a running task
+	TasksResubscribe   Method = "tasks/resubscribe"   // Resubscribe to updates for an existing task
+	
+	// Push notification methods
+	TasksPushNotificationGet Method = "tasks/pushNotification/get" // Get push notification configuration
+	TasksPushNotificationSet Method = "tasks/pushNotification/set" // Set push notification configuration
 )
 
+// SSEResponse represents a Server-Sent Event response containing a JSON-RPC response.
+// This is used when receiving streaming updates from an agent.
 type SSEResponse struct {
+	// Data contains the JSON-RPC response embedded in the SSE event
 	Data JSONRPCResponse `json:"data"`
 }
 
+// Params is an interface that all parameter types must implement.
+// It serves as a marker interface to group different parameter types
+// that can be used with A2A methods.
 type Params interface {
-	// some trivial func to glue types togethers
+	// paramGlue is a marker method that doesn't do anything but
+	// ensures type safety when working with different parameter types
 	paramGlue()
 }
 
@@ -140,8 +154,17 @@ func (r *JSONRPCRequest) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Result is an interface that all result types must implement.
+// It serves as a marker interface to group different result types
+// that can be returned from A2A methods.
+//
+// Implementations include:
+// - Task: Represents a complete task with all its details
+// - TaskStatusUpdateEvent: Represents an update to a task's status
+// - TaskArtifactUpdateEvent: Represents a new artifact produced by a task
 type Result interface {
-	// some trivial func to glue types together
+	// resultGlue is a marker method that doesn't do anything but
+	// ensures type safety when working with different result types
 	resultGlue()
 }
 

@@ -324,43 +324,76 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// PartType defines the type of part
+// PartType defines the type of content in a message part.
+// This is used to determine how to interpret the part's content.
 type PartType string
 
 const (
-	PartTypeText PartType = "text"
-	PartTypeFile PartType = "file"
-	PartTypeData PartType = "data"
+	PartTypeText PartType = "text" // Text content (plain text, markdown, etc.)
+	PartTypeFile PartType = "file" // File content (binary data, documents, images, etc.)
+	PartTypeData PartType = "data" // Structured data (JSON, etc.)
 )
 
-// Part represents a message part which can be text, file, or data
+// Part represents a message part which can contain different types of content.
+// It's implemented as an interface to allow for different concrete types
+// while maintaining a common interface for handling message parts.
+//
+// Implementations:
+// - TextPart: Contains text content
+// - FilePart: Contains file content (binary data or references)
+// - DataPart: Contains structured data
 type Part interface {
-	// some trivial method to glue types together
+	// partGlue is a marker method that doesn't do anything but
+	// ensures type safety when working with different part types
 	partGlue()
 }
 
+// TextPart represents a message part containing text content.
+// It implements the Part interface.
+type TextPart struct {
+	// Type indicates this is a text part (should always be "text")
+	Type PartType `json:"type"`
+	
+	// Text contains the actual text content
+	Text string `json:"text"`
+	
+	// Metadata contains optional additional information about this part
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+// partGlue implements the Part interface for TextPart
 func (p TextPart) partGlue() {}
 
-type TextPart struct {
-	Type     PartType       `json:"type"` // default value should be "text"
-	Text     string         `json:"text"`
-	Metadata map[string]any `json:"metadata,omitempty"`
-}
-
+// FilePart represents a message part containing file content.
+// It implements the Part interface.
 type FilePart struct {
-	Type     PartType       `json:"type"` // default value should be "file"
-	File     FileContent    `json:"file"`
+	// Type indicates this is a file part (should always be "file")
+	Type PartType `json:"type"`
+	
+	// File contains the file content or reference
+	File FileContent `json:"file"`
+	
+	// Metadata contains optional additional information about this part
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
+// partGlue implements the Part interface for FilePart
 func (p FilePart) partGlue() {}
 
+// DataPart represents a message part containing structured data.
+// It implements the Part interface.
 type DataPart struct {
-	Type     PartType       `json:"type"` // default value should be "data"
-	Data     map[string]any `json:"data"`
+	// Type indicates this is a data part (should always be "data")
+	Type PartType `json:"type"`
+	
+	// Data contains the structured data as a map
+	Data map[string]any `json:"data"`
+	
+	// Metadata contains optional additional information about this part
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
+// partGlue implements the Part interface for DataPart
 func (p DataPart) partGlue() {}
 
 // TextContent represents a text part
