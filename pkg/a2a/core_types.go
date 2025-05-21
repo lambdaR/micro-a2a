@@ -6,101 +6,6 @@ import (
 	"time"
 )
 
-// AgentCard conveys key information about an agent
-type AgentCard struct {
-	// Human readable name of the agent
-	Name string `json:"name"`
-
-	// Human-readable description of the agent
-	Description string `json:"description"`
-
-	// URL to the address the agent is hosted at
-	URL string `json:"url"`
-
-	// The service provider of the agent
-	Provider *AgentProvider `json:"provider,omitempty"`
-
-	// The version of the agent - format is up to the provider
-	Version string `json:"version"`
-
-	// URL to documentation for the agent
-	DocumentationURL string `json:"documentationUrl,omitempty"`
-
-	// Optional capabilities supported by the agent
-	Capabilities *AgentCapabilities `json:"capabilities"`
-
-	// Authentication requirements for the agent
-	Authentication *AgentAuthentication `json:"authentication"`
-
-	// Supported mime types for input
-	DefaultInputModes []string `json:"defaultInputModes"`
-
-	// Supported mime types for output
-	DefaultOutputModes []string `json:"defaultOutputModes"`
-
-	// Skills are a unit of capability that an agent can perform
-	Skills []AgentSkill `json:"skills"`
-}
-
-// Provider represents the service provider information
-type AgentProvider struct {
-	Organization string `json:"organization"`
-	URL          string `json:"url"`
-}
-
-// AgentCapabilities describes optional capabilities supported by the agent
-type AgentCapabilities struct {
-	// True if the agent supports SSE
-	Streaming bool `json:"streaming,omitempty"`
-
-	// True if the agent can notify updates to client
-	PushNotifications bool `json:"pushNotifications,omitempty"`
-
-	// True if the agent exposes status change history for tasks
-	StateTransitionHistory bool `json:"stateTransitionHistory,omitempty"`
-}
-
-type AuthSchema string
-
-// supported Auth schemas
-const (
-	Basic  AuthSchema = "Basic"
-	Bearer AuthSchema = "Bearer"
-)
-
-// AgentAuthentication describes authentication requirements
-type AgentAuthentication struct {
-	// Supported schemes (e.g. Basic, Bearer)
-	Schemes []AuthSchema `json:"schemes"`
-
-	// Credentials a client should use for private cards
-	Credentials string `json:"credentials,omitempty"`
-}
-
-// AgentSkill represents a unit of capability that an agent can perform
-type AgentSkill struct {
-	// Unique identifier for the agent's skill
-	ID string `json:"id"`
-
-	// Human readable name of the skill
-	Name string `json:"name"`
-
-	// Description of the skill
-	Description string `json:"description"`
-
-	// Tagwords describing classes of capabilities
-	Tags []string `json:"tags"`
-
-	// Example scenarios that the skill can perform
-	Examples []string `json:"examples,omitempty"`
-
-	// Supported mime types for input (if different than default)
-	InputModes []string `json:"inputModes,omitempty"`
-
-	// Supported mime types for output (if different than default)
-	OutputModes []string `json:"outputModes,omitempty"`
-}
-
 // TaskStatus represents the state of a task with additional context
 type TaskStatus struct {
 	State     TaskState  `json:"state"`               // current state of the task
@@ -353,10 +258,10 @@ type Part interface {
 type TextPart struct {
 	// Type indicates this is a text part (should always be "text")
 	Type PartType `json:"type"`
-	
+
 	// Text contains the actual text content
 	Text string `json:"text"`
-	
+
 	// Metadata contains optional additional information about this part
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
@@ -369,10 +274,10 @@ func (p TextPart) partGlue() {}
 type FilePart struct {
 	// Type indicates this is a file part (should always be "file")
 	Type PartType `json:"type"`
-	
+
 	// File contains the file content or reference
 	File FileContent `json:"file"`
-	
+
 	// Metadata contains optional additional information about this part
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
@@ -385,10 +290,10 @@ func (p FilePart) partGlue() {}
 type DataPart struct {
 	// Type indicates this is a data part (should always be "data")
 	Type PartType `json:"type"`
-	
+
 	// Data contains the structured data as a map
 	Data map[string]any `json:"data"`
-	
+
 	// Metadata contains optional additional information about this part
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
