@@ -1,5 +1,10 @@
 package a2a
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // AgentCard conveys key information about an agent
 type AgentCard struct {
 	// Human readable name of the agent
@@ -37,6 +42,88 @@ type AgentCard struct {
 
 	// Skills are a unit of capability that an agent can perform
 	Skills []AgentSkill `json:"skills"`
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface for AgentCard
+func (ac *AgentCard) UnmarshalJSON(data []byte) error {
+	// Create a type alias to avoid infinite recursion when unmarshaling
+	type AgentCardAlias AgentCard
+	
+	// Create a temporary struct with SecuritySchemes as map[string]json.RawMessage
+	// to capture the raw JSON for each security scheme
+	type AgentCardTemp struct {
+		AgentCardAlias
+		SecuritySchemes map[string]json.RawMessage `json:"securitySchemes,omitempty"`
+	}
+	
+	var temp AgentCardTemp
+	
+	// Unmarshal into the temporary struct
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+	
+	// Copy all fields except SecuritySchemes
+	*ac = AgentCard(temp.AgentCardAlias)
+	
+	// Initialize the SecuritySchemes map if needed
+	if len(temp.SecuritySchemes) > 0 {
+		ac.SecuritySchemes = make(map[string]SecurityScheme)
+		
+		// Process each security scheme
+		for key, rawScheme := range temp.SecuritySchemes {
+			// Create a temporary map to extract the "type" field
+			var schemeMap map[string]interface{}
+			if err := json.Unmarshal(rawScheme, &schemeMap); err != nil {
+				return err
+			}
+			
+			// Get the type value
+			typeValue, ok := schemeMap["type"].(string)
+			if !ok {
+				return fmt.Errorf("security scheme %s missing or invalid 'type' field", key)
+			}
+			
+			// Create the appropriate concrete type based on the "type" field
+			var scheme SecurityScheme
+			switch SecuritySchemeType(typeValue) {
+			case HTTPAuthSecurity:
+				var httpScheme HTTPAuthSecurityScheme
+				if err := json.Unmarshal(rawScheme, &httpScheme); err != nil {
+					return err
+				}
+				scheme = httpScheme
+				
+			case OAuth2Security:
+				var oauth2Scheme OAuth2SecurityScheme
+				if err := json.Unmarshal(rawScheme, &oauth2Scheme); err != nil {
+					return err
+				}
+				scheme = oauth2Scheme
+				
+			case OpenIdConnectSecurity:
+				var oidcScheme OpenIdConnectSecurityScheme
+				if err := json.Unmarshal(rawScheme, &oidcScheme); err != nil {
+					return err
+				}
+				scheme = oidcScheme
+				
+			case APIKeySecurity:
+				var apiKeyScheme APIKeySecurityScheme
+				if err := json.Unmarshal(rawScheme, &apiKeyScheme); err != nil {
+					return err
+				}
+				scheme = apiKeyScheme
+				
+			default:
+				return fmt.Errorf("unknown security scheme type: %s", typeValue)
+			}
+			
+			ac.SecuritySchemes[key] = scheme
+		}
+	}
+	
+	return nil
 }
 
 // Provider represents the service provider information
