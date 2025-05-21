@@ -17,13 +17,24 @@ type TaskStatus struct {
 type TaskState string
 
 const (
-	TaskStateSubmitted     TaskState = "submitted"
-	TaskStateWorking       TaskState = "working"
+	// Task received by server, acknowledged, but processing has not yet actively started.
+	TaskStateSubmitted TaskState = "submitted"
+	// Task is actively being processed by the agent.
+	TaskStateWorking TaskState = "working"
+	// Agent requires additional input from the client/user to proceed. (Task is paused)
 	TaskStateInputRequired TaskState = "input-required"
-	TaskStateCompleted     TaskState = "completed"
-	TaskStateCanceled      TaskState = "canceled"
-	TaskStateFailed        TaskState = "failed"
-	TaskStateUnknown       TaskState = "unknown"
+	// Task finished successfully. (Terminal state)
+	TaskStateCompleted TaskState = "completed"
+	// Task was canceled by the client or potentially by the server. (Terminal state)
+	TaskStateCanceled TaskState = "canceled"
+	// Task terminated due to an error during processing. (Terminal state)
+	TaskStateFailed TaskState = "failed"
+	// Task has be rejected by the remote agent (Terminal state)
+	TaskStateRejected TaskState = "rejected"
+	// Authentication required from client/user to proceed. (Task is paused)
+	TaskStateAuthRequired TaskState = "auth-required"
+	// The state of the task cannot be determined (e.g., task ID invalid or expired). (Effectively a terminal state from client's PoV for that ID)
+	TaskStateUnknown TaskState = "unknown"
 )
 
 // Artifact represents a piece of output or data produced by an agent
@@ -114,19 +125,32 @@ type MessageRole string
 const (
 	MessageRoleUser  MessageRole = "user"
 	MessageRoleAgent MessageRole = "agent"
+	
+	// Message kind constant
+	MessageKind string = "message"
 )
 
 // Message represents a communication between user and agent
 type Message struct {
-	Role     MessageRole    `json:"role"`
-	Parts    []Part         `json:"parts"`
-	Metadata map[string]any `json:"metadata,omitempty"`
+	Kind            string         `json:"kind,omitempty"`           // Event type, const "message"
+	MessageId       string         `json:"messageId,omitempty"`      // Identifier created by the message creator
+	Role            MessageRole    `json:"role"`                     // Message sender's role
+	Parts           []Part         `json:"parts"`                    // Message content
+	Metadata        map[string]any `json:"metadata,omitempty"`       // Extension metadata
+	TaskId          string         `json:"taskId,omitempty"`         // Identifier of task the message is related to
+	ContextId       string         `json:"contextId,omitempty"`      // The context the message is associated with
+	ReferenceTaskIds []string      `json:"referenceTaskIds,omitempty"` // List of tasks referenced as context by this message
 }
 
 type MessageWrapper struct {
-	Role     MessageRole       `json:"role"`
-	Parts    []json.RawMessage `json:"parts"`
-	Metadata map[string]any    `json:"metadata,omitempty"`
+	Kind            string           `json:"kind,omitempty"`
+	MessageId       string           `json:"messageId,omitempty"`
+	Role            MessageRole      `json:"role"`
+	Parts           []json.RawMessage `json:"parts"`
+	Metadata        map[string]any   `json:"metadata,omitempty"`
+	TaskId          string           `json:"taskId,omitempty"`
+	ContextId       string           `json:"contextId,omitempty"`
+	ReferenceTaskIds []string        `json:"referenceTaskIds,omitempty"`
 }
 
 // MarshalJSON implements the json.Marshaler interface for Message
@@ -137,6 +161,11 @@ func (m Message) MarshalJSON() ([]byte, error) {
 		Parts []json.RawMessage `json:"parts"`
 	}{
 		MessageAlias: MessageAlias(m),
+	}
+	
+	// Set default kind if not specified
+	if wrapper.Kind == "" {
+		wrapper.Kind = MessageKind
 	}
 
 	wrapper.Parts = make([]json.RawMessage, len(m.Parts))
