@@ -125,32 +125,32 @@ type MessageRole string
 const (
 	MessageRoleUser  MessageRole = "user"
 	MessageRoleAgent MessageRole = "agent"
-	
+
 	// Message kind constant
 	MessageKind string = "message"
 )
 
 // Message represents a communication between user and agent
 type Message struct {
-	Kind            string         `json:"kind,omitempty"`           // Event type, const "message"
-	MessageId       string         `json:"messageId,omitempty"`      // Identifier created by the message creator
-	Role            MessageRole    `json:"role"`                     // Message sender's role
-	Parts           []Part         `json:"parts"`                    // Message content
-	Metadata        map[string]any `json:"metadata,omitempty"`       // Extension metadata
-	TaskId          string         `json:"taskId,omitempty"`         // Identifier of task the message is related to
-	ContextId       string         `json:"contextId,omitempty"`      // The context the message is associated with
-	ReferenceTaskIds []string      `json:"referenceTaskIds,omitempty"` // List of tasks referenced as context by this message
+	Kind             string         `json:"kind"`                       // Event type, const "message"
+	MessageId        string         `json:"messageId"`                  // Identifier created by the message creator
+	Role             MessageRole    `json:"role"`                       // Message sender's role
+	Parts            []Part         `json:"parts"`                      // Message content
+	Metadata         map[string]any `json:"metadata,omitempty"`         // Extension metadata
+	TaskId           string         `json:"taskId,omitempty"`           // Identifier of task the message is related to
+	ContextId        string         `json:"contextId,omitempty"`        // The context the message is associated with
+	ReferenceTaskIds []string       `json:"referenceTaskIds,omitempty"` // List of tasks referenced as context by this message
 }
 
 type MessageWrapper struct {
-	Kind            string           `json:"kind,omitempty"`
-	MessageId       string           `json:"messageId,omitempty"`
-	Role            MessageRole      `json:"role"`
-	Parts           []json.RawMessage `json:"parts"`
-	Metadata        map[string]any   `json:"metadata,omitempty"`
-	TaskId          string           `json:"taskId,omitempty"`
-	ContextId       string           `json:"contextId,omitempty"`
-	ReferenceTaskIds []string        `json:"referenceTaskIds,omitempty"`
+	Kind             string            `json:"kind"`
+	MessageId        string            `json:"messageId"`
+	Role             MessageRole       `json:"role"`
+	Parts            []json.RawMessage `json:"parts"`
+	Metadata         map[string]any    `json:"metadata,omitempty"`
+	TaskId           string            `json:"taskId,omitempty"`
+	ContextId        string            `json:"contextId,omitempty"`
+	ReferenceTaskIds []string          `json:"referenceTaskIds,omitempty"`
 }
 
 // MarshalJSON implements the json.Marshaler interface for Message
@@ -162,10 +162,15 @@ func (m Message) MarshalJSON() ([]byte, error) {
 	}{
 		MessageAlias: MessageAlias(m),
 	}
-	
+
 	// Set default kind if not specified
 	if wrapper.Kind == "" {
 		wrapper.Kind = MessageKind
+	}
+
+	// Ensure required fields for spec compliance
+	if wrapper.MessageId == "" {
+		return nil, fmt.Errorf("messageId is required")
 	}
 
 	wrapper.Parts = make([]json.RawMessage, len(m.Parts))
@@ -173,16 +178,35 @@ func (m Message) MarshalJSON() ([]byte, error) {
 		var err error
 		switch p := part.(type) {
 		case TextPart:
+			// Ensure kind is set
+			if p.Kind == "" {
+				p.Kind = PartTypeText
+			}
 			wrapper.Parts[i], err = json.Marshal(p)
 		case FilePart:
+			if p.Kind == "" {
+				p.Kind = PartTypeFile
+			}
 			wrapper.Parts[i], err = json.Marshal(p)
 		case DataPart:
+			if p.Kind == "" {
+				p.Kind = PartTypeData
+			}
 			wrapper.Parts[i], err = json.Marshal(p)
 		case *TextPart:
+			if p.Kind == "" {
+				p.Kind = PartTypeText
+			}
 			wrapper.Parts[i], err = json.Marshal(p)
 		case *FilePart:
+			if p.Kind == "" {
+				p.Kind = PartTypeFile
+			}
 			wrapper.Parts[i], err = json.Marshal(p)
 		case *DataPart:
+			if p.Kind == "" {
+				p.Kind = PartTypeData
+			}
 			wrapper.Parts[i], err = json.Marshal(p)
 		default:
 			return nil, fmt.Errorf("unknown part type: %T", part)
@@ -201,49 +225,67 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	// Initialize the message structure
+	// Ensure required fields for spec compliance
+	if temp.MessageId == "" {
+		return fmt.Errorf("messageId is required")
+	}
+
+	// Copy all fields from the wrapper
+	m.Kind = temp.Kind
+	m.MessageId = temp.MessageId
 	m.Role = temp.Role
 	m.Metadata = temp.Metadata
+	m.TaskId = temp.TaskId
+	m.ContextId = temp.ContextId
+	m.ReferenceTaskIds = temp.ReferenceTaskIds
+
+	// Set default kind if not specified
+	if m.Kind == "" {
+		m.Kind = MessageKind
+	}
+
+	// Initialize parts slice with capacity
 	m.Parts = make([]Part, 0, len(temp.Parts))
 
 	// Process each part in the message
 	for _, rawPart := range temp.Parts {
-		// First unmarshal to get the type
 		var partMap map[string]interface{}
 		if err := json.Unmarshal(rawPart, &partMap); err != nil {
 			return fmt.Errorf("failed to parse part: %w", err)
 		}
 
-		// Get the type value
-		typeVal, ok := partMap["type"]
+		// Get the kind value (previously called "type")
+		kindVal, ok := partMap["kind"]
 		if !ok {
-			return fmt.Errorf("part missing required 'type' field")
+			// Try legacy "type" field for backward compatibility
+			kindVal, ok = partMap["type"]
+			if !ok {
+				return fmt.Errorf("part missing required 'kind' field")
+			}
 		}
 
-		typeStr, ok := typeVal.(string)
+		kindStr, ok := kindVal.(string)
 		if !ok {
-			return fmt.Errorf("part 'type' field must be a string")
+			return fmt.Errorf("part 'kind' field must be a string")
 		}
 
-		partType := PartType(typeStr)
-
-		// Based on the type, create the appropriate part
-		switch partType {
-		case PartTypeText:
+		// Create the appropriate part based on kind
+		switch kindStr {
+		case string(PartTypeText):
 			var textPart TextPart
 			if err := json.Unmarshal(rawPart, &textPart); err != nil {
 				return fmt.Errorf("failed to unmarshal text part: %w", err)
 			}
 			m.Parts = append(m.Parts, textPart)
 
-		case PartTypeFile:
+		case string(PartTypeFile):
 			var filePart FilePart
 			if err := json.Unmarshal(rawPart, &filePart); err != nil {
 				return fmt.Errorf("failed to unmarshal file part: %w", err)
 			}
 			m.Parts = append(m.Parts, filePart)
 
-		case PartTypeData:
+		case string(PartTypeData):
 			var dataPart DataPart
 			if err := json.Unmarshal(rawPart, &dataPart); err != nil {
 				return fmt.Errorf("failed to unmarshal data part: %w", err)
@@ -251,7 +293,7 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 			m.Parts = append(m.Parts, dataPart)
 
 		default:
-			return fmt.Errorf("unknown part type: %s", partType)
+			return fmt.Errorf("unknown part kind: %s", kindStr)
 		}
 	}
 
@@ -285,8 +327,8 @@ type Part interface {
 // TextPart represents a message part containing text content.
 // It implements the Part interface.
 type TextPart struct {
-	// Type indicates this is a text part (should always be "text")
-	Type PartType `json:"type"`
+	// Kind indicates this is a text part (should always be "text")
+	Kind PartType `json:"kind"`
 
 	// Text contains the actual text content
 	Text string `json:"text"`
@@ -301,8 +343,8 @@ func (p TextPart) partGlue() {}
 // FilePart represents a message part containing file content.
 // It implements the Part interface.
 type FilePart struct {
-	// Type indicates this is a file part (should always be "file")
-	Type PartType `json:"type"`
+	// Kind indicates this is a file part (should always be "file")
+	Kind PartType `json:"kind"`
 
 	// File contains the file content or reference
 	File FileContent `json:"file"`
@@ -317,8 +359,8 @@ func (p FilePart) partGlue() {}
 // DataPart represents a message part containing structured data.
 // It implements the Part interface.
 type DataPart struct {
-	// Type indicates this is a data part (should always be "data")
-	Type PartType `json:"type"`
+	// Kind indicates this is a data part (should always be "data")
+	Kind PartType `json:"kind"`
 
 	// Data contains the structured data as a map
 	Data map[string]any `json:"data"`

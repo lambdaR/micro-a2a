@@ -20,7 +20,7 @@ func main() {
 			Role: a2a.MessageRoleUser,
 			Parts: []a2a.Part{
 				&a2a.TextPart{
-					Type: a2a.PartTypeText,
+					Kind: a2a.PartTypeText,
 					Text: "what is the current time",
 				},
 			},
@@ -46,7 +46,7 @@ func main() {
 			Role: a2a.MessageRoleUser,
 			Parts: []a2a.Part{
 				&a2a.TextPart{
-					Type: a2a.PartTypeText,
+					Kind: a2a.PartTypeText,
 					Text: "time ticks every 5 seconds",
 				},
 			},

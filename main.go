@@ -29,7 +29,7 @@ func (a *MyAgentHandlers) TaskHandler(req a2a.JSONRPCRequest) a2a.JSONRPCRespons
 					Name: prompt,
 					Parts: []a2a.Part{
 						a2a.TextPart{
-							Type: a2a.PartTypeText,
+							Kind: a2a.PartTypeText,
 							Text: time.Now().String(),
 						},
 					},
@@ -58,7 +58,7 @@ func (a *MyAgentHandlers) StreamHandler(req a2a.JSONRPCRequest, res chan a2a.JSO
 						Name: "time ticks every 1 second",
 						Parts: []a2a.Part{
 							a2a.TextPart{
-								Type: a2a.PartTypeText,
+								Kind: a2a.PartTypeText,
 								Text: time.Now().String(),
 							},
 						},
