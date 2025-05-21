@@ -285,7 +285,7 @@ type FilePart struct {
 	Kind PartType `json:"kind"`
 
 	// File contains the file content or reference
-	File FileContent `json:"file"`
+	File FileBase `json:"file"`
 
 	// Metadata contains optional additional information about this part
 	Metadata map[string]any `json:"metadata,omitempty"`
@@ -315,12 +315,12 @@ type TextContent struct {
 	Text string `json:"text"`
 }
 
-// FileContent represents a file part
-type FileContent struct {
-	Name     string `json:"name,omitempty"`
-	MimeType string `json:"mimeType,omitempty"`
-	Bytes    string `json:"bytes,omitempty"` // base64 encoded content
-	URI      string `json:"uri,omitempty"`
+// FileBase represents the base entity for FileParts
+type FileBase struct {
+	Name     string `json:"name,omitempty"`     // Optional name for the file
+	MimeType string `json:"mimeType,omitempty"` // Optional mimeType for the file
+	Bytes    string `json:"bytes,omitempty"`    // base64 encoded content of the file
+	URI      string `json:"uri,omitempty"`      // URL for the File content
 }
 
 // Helper function to unmarshal a part from raw JSON
