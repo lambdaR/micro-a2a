@@ -20,7 +20,7 @@ func (a *MyAgentHandlers) TaskHandler(req a2a.JSONRPCRequest) a2a.JSONRPCRespons
 		ID:      req.ID,
 		Result: &a2a.Task{
 			ID:        uuid.New().String(),
-			SessionID: uuid.New().String(),
+			ContextID: uuid.New().String(),
 			Status: a2a.TaskStatus{
 				State: a2a.TaskStateCompleted,
 			},

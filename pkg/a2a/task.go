@@ -3,14 +3,27 @@ package a2a
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 )
+
+// Task represents a unit of work being processed by an agent
+type Task struct {
+	Kind      string         `json:"kind"`                // Event type, const "task"
+	ID        string         `json:"id"`                  // Unique identifier for the task
+	ContextID string         `json:"contextId"`           // Server-generated id for contextual alignment across interactions
+	Status    TaskStatus     `json:"status"`              // Current status of the task
+	History   []Message      `json:"history,omitempty"`   // Optional message history
+	Artifacts []Artifact     `json:"artifacts,omitempty"` // Optional collection of artifacts created by the agent
+	Metadata  map[string]any `json:"metadata,omitempty"`  // Extension metadata
+}
+
+// Implement Result interface
+func (t Task) resultGlue() {}
 
 // TaskStatus represents the state of a task with additional context
 type TaskStatus struct {
-	State     TaskState  `json:"state"`               // current state of the task
-	Message   *Message   `json:"message,omitempty"`   // additional status updates
-	Timestamp *time.Time `json:"timestamp,omitempty"` // ISO datetime value
+	State     TaskState `json:"state"`               // Current state of the task
+	Message   *Message  `json:"message,omitempty"`   // Additional status updates for client
+	Timestamp string    `json:"timestamp,omitempty"` // ISO 8601 datetime string when the status was recorded
 }
 
 // TaskState represents possible states of a task
@@ -39,13 +52,11 @@ const (
 
 // Artifact represents a piece of output or data produced by an agent
 type Artifact struct {
-	Name        string         `json:"name,omitempty"`
-	Description string         `json:"description,omitempty"`
-	Parts       []Part         `json:"parts"` // Required parts of the artifact
-	Metadata    map[string]any `json:"metadata,omitempty"`
-	Index       int            `json:"index"`
-	Append      bool           `json:"append,omitempty"`
-	LastChunk   bool           `json:"lastChunk,omitempty"`
+	ArtifactID  string         `json:"artifactId"`            // Unique identifier for the artifact
+	Name        string         `json:"name,omitempty"`        // Optional name for the artifact
+	Description string         `json:"description,omitempty"` // Optional description for the artifact
+	Parts       []Part         `json:"parts"`                 // Required parts of the artifact
+	Metadata    map[string]any `json:"metadata,omitempty"`    // Extension metadata
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for Artifact
@@ -62,53 +73,21 @@ func (a *Artifact) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	// Ensure required fields for spec compliance
+	if temp.ArtifactID == "" {
+		return fmt.Errorf("artifactId is required")
+	}
+
 	// Initialize parts slice
 	a.Parts = make([]Part, 0, len(temp.Parts))
 
 	// Process each part
 	for _, rawPart := range temp.Parts {
-		var partMap map[string]interface{}
-		if err := json.Unmarshal(rawPart, &partMap); err != nil {
-			return fmt.Errorf("failed to parse part: %w", err)
+		part, err := unmarshalPart(rawPart)
+		if err != nil {
+			return err
 		}
-
-		typeVal, ok := partMap["type"]
-		if !ok {
-			return fmt.Errorf("part missing required 'type' field")
-		}
-
-		typeStr, ok := typeVal.(string)
-		if !ok {
-			return fmt.Errorf("part 'type' field must be a string")
-		}
-
-		partType := PartType(typeStr)
-
-		switch partType {
-		case PartTypeText:
-			var textPart TextPart
-			if err := json.Unmarshal(rawPart, &textPart); err != nil {
-				return fmt.Errorf("failed to unmarshal text part: %w", err)
-			}
-			a.Parts = append(a.Parts, textPart)
-
-		case PartTypeFile:
-			var filePart FilePart
-			if err := json.Unmarshal(rawPart, &filePart); err != nil {
-				return fmt.Errorf("failed to unmarshal file part: %w", err)
-			}
-			a.Parts = append(a.Parts, filePart)
-
-		case PartTypeData:
-			var dataPart DataPart
-			if err := json.Unmarshal(rawPart, &dataPart); err != nil {
-				return fmt.Errorf("failed to unmarshal data part: %w", err)
-			}
-			a.Parts = append(a.Parts, dataPart)
-
-		default:
-			return fmt.Errorf("unknown part type: %s", partType)
-		}
+		a.Parts = append(a.Parts, part)
 	}
 
 	return nil
@@ -249,52 +228,11 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 
 	// Process each part in the message
 	for _, rawPart := range temp.Parts {
-		var partMap map[string]interface{}
-		if err := json.Unmarshal(rawPart, &partMap); err != nil {
-			return fmt.Errorf("failed to parse part: %w", err)
+		part, err := unmarshalPart(rawPart)
+		if err != nil {
+			return err
 		}
-
-		// Get the kind value (previously called "type")
-		kindVal, ok := partMap["kind"]
-		if !ok {
-			// Try legacy "type" field for backward compatibility
-			kindVal, ok = partMap["type"]
-			if !ok {
-				return fmt.Errorf("part missing required 'kind' field")
-			}
-		}
-
-		kindStr, ok := kindVal.(string)
-		if !ok {
-			return fmt.Errorf("part 'kind' field must be a string")
-		}
-
-		// Create the appropriate part based on kind
-		switch kindStr {
-		case string(PartTypeText):
-			var textPart TextPart
-			if err := json.Unmarshal(rawPart, &textPart); err != nil {
-				return fmt.Errorf("failed to unmarshal text part: %w", err)
-			}
-			m.Parts = append(m.Parts, textPart)
-
-		case string(PartTypeFile):
-			var filePart FilePart
-			if err := json.Unmarshal(rawPart, &filePart); err != nil {
-				return fmt.Errorf("failed to unmarshal file part: %w", err)
-			}
-			m.Parts = append(m.Parts, filePart)
-
-		case string(PartTypeData):
-			var dataPart DataPart
-			if err := json.Unmarshal(rawPart, &dataPart); err != nil {
-				return fmt.Errorf("failed to unmarshal data part: %w", err)
-			}
-			m.Parts = append(m.Parts, dataPart)
-
-		default:
-			return fmt.Errorf("unknown part kind: %s", kindStr)
-		}
+		m.Parts = append(m.Parts, part)
 	}
 
 	return nil
@@ -385,66 +323,48 @@ type FileContent struct {
 	URI      string `json:"uri,omitempty"`
 }
 
-// // NewTextPart creates a new text part
-// func NewTextPart(text string, metadata map[string]any) Part {
-// 	return Part{
-// 		Type:        PartTypeText,
-// 		TextContent: &TextContent{Text: text},
-// 		Metadata:    metadata,
-// 	}
-// }
-//
-// // NewFilePart creates a new file part
-// func NewFilePart(file FileContent, metadata map[string]any) Part {
-// 	return Part{
-// 		Type:        PartTypeFile,
-// 		FileContent: &file,
-// 		Metadata:    metadata,
-// 	}
-// }
-//
-// // NewDataPart creates a new data part
-// func NewDataPart(data map[string]any, metadata map[string]any) Part {
-// 	return Part{
-// 		Type:        PartTypeData,
-// 		DataContent: data,
-// 		Metadata:    metadata,
-// 	}
-// }
-//
-// // UnmarshalJSON custom unmarshaler for Part to handle the union type
-// func (p *Part) UnmarshalJSON(data []byte) error {
-// 	type Alias Part
-// 	aux := &struct {
-// 		*Alias
-// 	}{
-// 		Alias: (*Alias)(p),
-// 	}
-//
-// 	if err := json.Unmarshal(data, &aux); err != nil {
-// 		return err
-// 	}
-//
-// 	// Validate that only the correct content is set based on type
-// 	switch p.Type {
-// 	case PartTypeText:
-// 		if p.TextContent == nil {
-// 			return json.Unmarshal(data, &p.TextContent)
-// 		}
-// 	case PartTypeFile:
-// 		if p.FileContent == nil {
-// 			return json.Unmarshal(data, &p.FileContent)
-// 		}
-// 	case PartTypeData:
-// 		if p.DataContent == nil {
-// 			return json.Unmarshal(data, &p.DataContent)
-// 		}
-// 	default:
-// 		return nil
-// 	}
-//
-// 	return nil
-// }
+// Helper function to unmarshal a part from raw JSON
+func unmarshalPart(data []byte) (Part, error) {
+	var partMap map[string]interface{}
+	if err := json.Unmarshal(data, &partMap); err != nil {
+		return nil, fmt.Errorf("failed to parse part: %w", err)
+	}
+
+	// Get the kind value (previously called "type")
+	kindVal, ok := partMap["kind"]
+
+	kindStr, ok := kindVal.(string)
+	if !ok {
+		return nil, fmt.Errorf("part 'kind' field must be a string")
+	}
+
+	// Create the appropriate part based on kind
+	switch kindStr {
+	case string(PartTypeText):
+		var textPart TextPart
+		if err := json.Unmarshal(data, &textPart); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal text part: %w", err)
+		}
+		return textPart, nil
+
+	case string(PartTypeFile):
+		var filePart FilePart
+		if err := json.Unmarshal(data, &filePart); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal file part: %w", err)
+		}
+		return filePart, nil
+
+	case string(PartTypeData):
+		var dataPart DataPart
+		if err := json.Unmarshal(data, &dataPart); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal data part: %w", err)
+		}
+		return dataPart, nil
+
+	default:
+		return nil, fmt.Errorf("unknown part kind: %s", kindStr)
+	}
+}
 
 // PushNotificationConfig defines configuration for push notifications
 type PushNotificationConfig struct {

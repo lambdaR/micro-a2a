@@ -34,7 +34,7 @@ const (
 	TasksGet           Method = "tasks/get"           // Get information about a task
 	TasksCancel        Method = "tasks/cancel"        // Cancel a running task
 	TasksResubscribe   Method = "tasks/resubscribe"   // Resubscribe to updates for an existing task
-	
+
 	// Push notification methods
 	TasksPushNotificationGet Method = "tasks/pushNotification/get" // Get push notification configuration
 	TasksPushNotificationSet Method = "tasks/pushNotification/set" // Set push notification configuration
@@ -167,18 +167,6 @@ type Result interface {
 	// ensures type safety when working with different result types
 	resultGlue()
 }
-
-// Task represents a unit of work being processed by an agent
-type Task struct {
-	ID        string         `json:"id"`                  // unique identifier for the task
-	SessionID string         `json:"sessionId"`           // client-generated id for the session holding the task
-	Status    TaskStatus     `json:"status"`              // current status of the task
-	History   []Message      `json:"history,omitempty"`   // optional message history
-	Artifacts []Artifact     `json:"artifacts,omitempty"` // optional collection of artifacts
-	Metadata  map[string]any `json:"metadata,omitempty"`  // extension metadata
-}
-
-func (t Task) resultGlue() {}
 
 // TaskStatusUpdateEvent is sent during sendSubscribe or subscribe requests
 type TaskStatusUpdateEvent struct {
